@@ -1,4 +1,10 @@
 #include "systemcalls.h"
+#include <stdlib.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -9,15 +15,17 @@
 */
 bool do_system(const char *cmd)
 {
+    // call system() to execute cmd, ret represents status
+    int ret = system(cmd);
 
-/*
- * TODO  add your code here
- *  Call the system() function with the command set in the cmd
- *   and return a boolean true if the system() call completed with success
- *   or false() if it returned a failure
-*/
+    if(ret == -1) {
+        // calling system() fails
+        return false;
+    }
 
-    return true;
+    // WIFEXITED checks if child terminates normally
+    // WEXITSTATUS gains exit code
+    return WIFEXITED(ret) && WEXITSTATUS(ret) == 0;
 }
 
 /**
@@ -48,20 +56,34 @@ bool do_exec(int count, ...)
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
     command[count] = command[count];
-
-/*
- * TODO:
- *   Execute a system command by calling fork, execv(),
- *   and wait instead of system (see LSP page 161).
- *   Use the command[0] as the full path to the command to execute
- *   (first argument to execv), and use the remaining arguments
- *   as second argument to the execv() command.
- *
-*/
-
     va_end(args);
 
-    return true;
+    // build child process
+    pid_t pid = fork();
+
+    if(pid == -1) {
+        // fails to fork
+        return -1;
+    }
+    else if(pid == 0) {
+        // child executes the command
+        execv(command[0], command);
+        exit(-1);
+    }
+    
+    
+    int status;
+
+    // parent wait for its child
+    if(waitpid(pid, &status, 0) == -1) {
+        // waitpid fails
+        return -1;
+    } 
+    else if (WIFEXITED(status)) {
+        return WEXITSTATUS(status) == 0;
+    }
+
+    return false;
 }
 
 /**
@@ -83,17 +105,39 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
     command[count] = command[count];
-
-
-/*
- * TODO
- *   Call execv, but first using https://stackoverflow.com/a/13784315/1446624 as a refernce,
- *   redirect standard out to a file specified by outputfile.
- *   The rest of the behaviour is same as do_exec()
- *
-*/
-
     va_end(args);
 
-    return true;
+    pid_t pid = fork();
+    if(pid == -1) {
+        perror("fork failed");
+        return false;    
+    }
+    if(pid == 0) {
+        int fd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if(fd < 0) {
+            perror("open failed");
+            exit(-1);
+        }
+        if(dup2(fd, STDOUT_FILENO) < 0) {
+            perror("dup2 failed");
+            close(fd);
+            exit(-1);
+        }
+        close(fd);
+
+        execv(command[0], command);
+        perror("execv failed");
+        exit(-1);
+    }
+
+    int status;
+    if(waitpid(pid, &status, 0) == -1) {
+        perror("waitpid failed");
+        return false;
+    }
+    else if(WIFEXITED(status)){
+        return WEXITSTATUS(status) == 0;
+    }
+
+    return false;
 }
