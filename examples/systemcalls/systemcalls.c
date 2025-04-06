@@ -53,31 +53,34 @@ bool do_exec(int count, ...)
         command[i] = va_arg(args, char *);
     }
     command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
     command[count] = command[count];
     va_end(args);
 
-    // build child process
+    // fork child process
     pid_t pid = fork();
 
     if(pid == -1) {
-        // fails to fork
-        return -1;
+        // parent fails to fork
+        perror("fork failed");
+        return false;
     }
     else if(pid == 0) {
         // child executes the command
         execv(command[0], command);
+        // when sth wrong occurs, it will come back here, or it never comes back
+        // return -1 on errors
+        perror("execv failed");
         exit(-1);
     }
     
     
     int status;
 
-    // parent wait for its child
+    // parent waits for its child
     if(waitpid(pid, &status, 0) == -1) {
-        // waitpid fails
-        return -1;
+        // waitpid fails, because child return -1 on error
+        perror("waitpid failed");
+        return false;
     } 
     else if (WIFEXITED(status)) {
         return WEXITSTATUS(status) == 0;
@@ -102,8 +105,6 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
         command[i] = va_arg(args, char *);
     }
     command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
     command[count] = command[count];
     va_end(args);
 
@@ -113,6 +114,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
         return false;    
     }
     if(pid == 0) {
+        // let child to write the file
         int fd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if(fd < 0) {
             perror("open failed");
