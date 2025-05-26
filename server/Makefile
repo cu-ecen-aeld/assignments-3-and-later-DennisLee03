@@ -5,7 +5,7 @@ CFLAGS = -Wall -Werror -g
 .PHONY: all clean
 
 default: all
-all: clean aesdsocket
+all: aesdsocket
 
 aesdsocket: aesdsocket.c
 	$(CC) $(CFLAGS) -o aesdsocket aesdsocket.c
