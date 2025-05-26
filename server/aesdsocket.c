@@ -174,7 +174,7 @@ void converse(int sockfd) {
         syslog(LOG_INFO, "Accepted connection from %s\n", client_ip);
     }
 
-    if (receive(sockfd) == true) dispatch(sockfd);
+    receive(sockfd);
 
     sock_close(sockfd);
     if (is_daemon == false) {
@@ -221,15 +221,21 @@ bool receive(int sockfd) {
 	}
 
 	if (write(outfd, packet, packet_size) != packet_size) {
-		handle_error("Error writing to out file", errno);
-		free(packet);
-		file_close(outfd);
-		return false;
-	}
+        handle_error("Error writing to out file", errno);
+        free(packet);
+        file_close(outfd);
+        return false;
+    }
+    file_close(outfd);
 
-	free(packet);
-	file_close(outfd);
-	return true;
+    if (send(sockfd, packet, packet_size, 0) != packet_size) {
+        handle_error("Error sending data back to client", errno);
+        free(packet);
+        return false;
+    }
+
+    free(packet);
+    return false;
 }
 
 
