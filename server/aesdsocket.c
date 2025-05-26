@@ -219,6 +219,8 @@ bool receive(int sockfd) {
     }
   }
 
+  fsync(outfd);
+
   file_close(outfd);
   return true;
 }
